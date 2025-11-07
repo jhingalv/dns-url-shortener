@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNS URL Shortener 🌐</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 2rem;
+            background: #f0f2f5;
+            color: #333;
+        }
+        h1 { color: #007bff; }
+        input, button {
+            padding: 0.5rem;
+            font-size: 1rem;
+            margin-top: 0.5rem;
+        }
+        button {
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+        }
+        .result {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #fff;
+            border: 1px solid #ddd;
+            word-break: break-word;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>DNS URL Shortener 🌐</h1>
+    <p>Introduce una URL larga y genera tu enlace corto:</p>
+    <input type="text" id="longUrl" placeholder="https://ejemplo.com/pagina" size="50">
+    <button id="shortenBtn">Acortar URL</button>
+
+    <div class="result" id="result" style="display:none;"></div>
+
+    <script>
+        const btn = document.getElementById("shortenBtn");
+        const resultDiv = document.getElementById("result");
+
+        btn.addEventListener("click", async () => {
+            const url = document.getElementById("longUrl").value.trim();
+            if (!url) {
+                alert("Por favor ingresa una URL válida.");
+                return;
+            }
+
+            resultDiv.style.display = "block";
+            resultDiv.textContent = "Generando URL corta...";
+
+            try {
+                const res = await fetch("/api/create", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    resultDiv.innerHTML = `<span class="error">Error: ${data.error}</span>`;
+                    return;
+                }
+
+                resultDiv.innerHTML = `
+                    ✅ URL corta creada: <a href="${data.short_url}" target="_blank">${data.short_url}</a><br>
+                    Hash: ${data.hash}<br>
+                    Original: ${data.original_url}<br>
+                    <button onclick="copyToClipboard('${data.short_url}')">Copiar al portapapeles</button>
+                `;
+            } catch (err) {
+                resultDiv.innerHTML = `<span class="error">Error: ${err.message}</span>`;
+            }
+        });
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text)
+                .then(() => alert("Copiado al portapapeles ✅"))
+                .catch(err => alert("Error al copiar: " + err));
+        }
+    </script>
+</body>
+</html>
