@@ -12,7 +12,7 @@ entryPoints:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: tu-email@dominio.com
+      email: jhingal3010@ieszaidinvergeles.org
       storage: /letsencrypt/acme.json
       httpChallenge:
         entryPoint: web
