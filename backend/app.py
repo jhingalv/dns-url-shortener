@@ -33,7 +33,7 @@ def generate_hash(url: str, length: int = 4) -> str:
 def create_txt_record(subdomain: str, target_url: str):
     data = {
         "type": "TXT",
-        "name": f'"{subdomain}.{DOMAIN}"',
+        "name": f"{subdomain}.{DOMAIN}",
         "content": target_url,
         "ttl": 3600
     }
