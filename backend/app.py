@@ -31,6 +31,14 @@ def is_valid_url(url: str) -> bool:
         print(f"[WARN] Error validating URL {url}: {e}")
         return False
 
+def extract_domain(url: str) -> str:
+    try:
+        parsed_url = urlparse(url)
+        return parsed_url.hostname
+    except Exception as e:
+        print(f"[WARN] Error extracting domain from {url}: {e}")
+        return ""
+
 def generate_hash(url: str, length: int = 4) -> str:
     return hashlib.sha256(url.encode()).hexdigest()[:length]
 
@@ -70,6 +78,10 @@ def create_short_url():
 
     if not long_url or not is_valid_url(long_url):
         return jsonify({"error": "Invalid URL"}), 400
+
+    domain = extract_domain(long_url)
+    if not domain:
+        return jsonify({"error": "Invalid domain extracted from URL"}), 400
 
     short_hash = generate_hash(long_url)
     short_url = f"{short_hash}.{DOMAIN}"
