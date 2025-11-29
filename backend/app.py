@@ -27,16 +27,14 @@ def is_valid_url(url: str) -> bool:
     try:
         parsed = urlparse(url)
         return parsed.scheme in ("http", "https") and bool(parsed.netloc)
-    except Exception as e:
-        print(f"[WARN] Error validating URL {url}: {e}")
+    except Exception:
         return False
 
 def extract_domain(url: str) -> str:
     try:
         parsed_url = urlparse(url)
         return parsed_url.hostname
-    except Exception as e:
-        print(f"[WARN] Error extracting domain from {url}: {e}")
+    except Exception:
         return ""
 
 def generate_hash(url: str, length: int = 4) -> str:
@@ -49,33 +47,45 @@ def create_txt_record(subdomain: str, target_url: str):
         "content": target_url,
         "ttl": 3600
     }
-    try:
-        response = requests.post(CF_API_BASE, headers=HEADERS, json=data)
-        if response.status_code != 200 or not response.json().get("success"):
-            raise Exception(f"Error creating TXT record: {response.text}")
-        return response.json()
-    except requests.RequestException as e:
-        raise Exception(f"Error during API request to Cloudflare: {e}")
+    response = requests.post(CF_API_BASE, headers=HEADERS, json=data)
+    if response.status_code != 200 or not response.json().get("success"):
+        raise Exception(f"Error creating TXT record: {response.text}")
+    return response.json()
 
 def resolve_txt_record(subdomain: str):
     fqdn = f"{subdomain}.{DOMAIN}"
     try:
         answers = dns.resolver.resolve(fqdn, "TXT")
         for rdata in answers:
-            txt_value = rdata.to_text().strip('"')
-            return txt_value
-    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN) as e:
-        print(f"[WARN] No TXT record found for {fqdn}: {e}")
+            return rdata.to_text().strip('"')
+    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
         return None
-    except Exception as e:
-        print(f"[WARN] Error resolving TXT record for {fqdn}: {e}")
+    except Exception:
         return None
+
+@app.errorhandler(Exception)
+def handle_all_errors(e):
+    response = {
+        "error": str(e),
+        "type": type(e).__name__
+    }
+    return jsonify(response), getattr(e, "code", 500)
+
+@app.errorhandler(404)
+def handle_404(e):
+    return jsonify({"error": "Not found"}), 404
+
+@app.errorhandler(405)
+def handle_405(e):
+    return jsonify({"error": "Method not allowed"}), 405
 
 @app.route("/api/create", methods=["POST"])
 def create_short_url():
-    data = request.get_json()
-    long_url = data.get("url", "").strip()
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Missing JSON body"}), 400
 
+    long_url = data.get("url", "").strip()
     if not long_url or not is_valid_url(long_url):
         return jsonify({"error": "Invalid URL"}), 400
 
