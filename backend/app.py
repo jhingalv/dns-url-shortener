@@ -112,7 +112,12 @@ def redirect_from_hash(hash_code):
     target_url = resolve_txt_record(hash_code)
     if not target_url:
         return jsonify({"error": "URL not found"}), 404
-    return redirect(target_url, code=302)
+
+    return jsonify({
+        "short_url": f"{hash_code}.{DOMAIN}",
+        "redirect_url": target_url
+    })
+
 
 @app.route("/")
 def index():
