@@ -40,12 +40,21 @@ def create_txt_record(subdomain: str, target_url: str):
         "content": target_url,
         "ttl": 3600
     }
-    response = requests.post(CF_API_BASE, headers=HEADERS, json=data)
-    if response.status_code != 200:
-        raise Exception(f"Cloudflare API error (status {response.status_code}): {response.text}")
-    result = response.json()
-    if not result.get("success"):
-        raise Exception(f"Cloudflare API returned error: {result}")
+    
+    try:
+        response = requests.post(CF_API_BASE, headers=HEADERS, json=data)
+        response.raise_for_status()  # Verificar errores HTTP
+        result = response.json()
+        
+        if not result.get("success"):
+            raise Exception(f"Cloudflare API returned error: {result}")
+    except requests.exceptions.HTTPError as http_err:
+        raise Exception(f"HTTP error occurred: {http_err}")
+    except requests.exceptions.RequestException as req_err:
+        raise Exception(f"Request error occurred: {req_err}")
+    except ValueError:
+        raise Exception(f"Error parsing JSON from Cloudflare response: {response.text}")
+
     return fqdn
 
 @app.route("/api/create", methods=["POST"])
@@ -77,10 +86,19 @@ def get_short_url(hash_code):
     try:
         url = f"https://api.cloudflare.com/client/v4/zones/{CLOUDFLARE_ZONE_ID}/dns_records?type=TXT&name={fqdn}"
         resp = requests.get(url, headers=HEADERS)
+        resp.raise_for_status()
         data = resp.json()
+
         if not data.get("success") or len(data.get("result", [])) == 0:
             return jsonify({"error": "Short URL not found"}), 404
+
         target_url = data["result"][0]["content"]
+    except requests.exceptions.HTTPError as http_err:
+        return jsonify({"error": f"HTTP error occurred: {http_err}"}), 500
+    except requests.exceptions.RequestException as req_err:
+        return jsonify({"error": f"Request error occurred: {req_err}"}), 500
+    except ValueError:
+        return jsonify({"error": "Error parsing JSON from Cloudflare response"}), 500
     except Exception as e:
         return jsonify({"error": f"Failed to fetch TXT record: {str(e)}"}), 500
 
