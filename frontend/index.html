@@ -62,20 +62,17 @@ btn.addEventListener("click", async () => {
             return;
         }
 
-        if (data.redirect_url) {
-            window.location.href = data.redirect_url;
-            return;
-        }
-
         resultDiv.innerHTML = `
             URL created: <a href="https://${data.short_url}" target="_blank">${data.short_url}</a><br>
             Original URL: ${data.original_url}<br>
             <button class="copy-btn" onclick="copyToClipboard('https://${data.short_url}')">Copy to clipboard</button>
         `;
+
     } catch (err) {
         resultDiv.innerHTML = `<span class="error">Error: ${err.message}</span>`;
     }
 });
+
 
 function copyToClipboard(text) {
     navigator.clipboard.writeText(text)
