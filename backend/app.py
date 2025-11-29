@@ -14,7 +14,7 @@ CLOUDFLARE_ZONE_ID = os.getenv("CLOUDFLARE_ZONE_ID")
 DOMAIN = os.getenv("DOMAIN")
 
 if not CLOUDFLARE_API_TOKEN or not CLOUDFLARE_ZONE_ID or not DOMAIN:
-    raise ValueError("Missing necessary environment variables: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ZONE_ID or DOMAIN")
+    raise ValueError("Missing environment variables: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ZONE_ID or DOMAIN")
 
 CF_API_BASE = f"https://api.cloudflare.com/client/v4/zones/{CLOUDFLARE_ZONE_ID}/dns_records"
 HEADERS = {
@@ -26,27 +26,25 @@ def is_valid_url(url: str) -> bool:
     try:
         parsed = urlparse(url)
         return parsed.scheme in ("http", "https") and bool(parsed.netloc)
-    except Exception:
+    except:
         return False
 
 def generate_hash(url: str, length: int = 4) -> str:
     return hashlib.sha256(url.encode()).hexdigest()[:length]
 
 def create_txt_record(subdomain: str, target_url: str):
-    fqdn = f"{subdomain}.urlshorten.{DOMAIN}"
+    name = f"{subdomain}.urlshorten"
     data = {
         "type": "TXT",
-        "name": fqdn,
+        "name": name,
         "content": target_url,
         "ttl": 3600
     }
-    response = requests.post(CF_API_BASE, headers=HEADERS, json=data)
-    if response.status_code != 200:
-        raise Exception(f"Cloudflare API error (status {response.status_code}): {response.text}")
-    result = response.json()
+    resp = requests.post(CF_API_BASE, headers=HEADERS, json=data)
+    result = resp.json()
     if not result.get("success"):
-        raise Exception(f"Cloudflare API returned error: {result}")
-    return fqdn
+        raise Exception(f"Cloudflare API error: {result}")
+    return name
 
 @app.route("/api/create", methods=["POST"])
 def create_short_url():
@@ -61,21 +59,23 @@ def create_short_url():
     short_hash = generate_hash(long_url)
 
     try:
-        short_domain = create_txt_record(short_hash, long_url)
+        short_name = create_txt_record(short_hash, long_url)
     except Exception as e:
         return jsonify({"error": f"Failed to create TXT record: {str(e)}"}), 500
 
+    short_url = f"{short_hash}.urlshorten.{DOMAIN}"
+
     return jsonify({
-        "short_url": short_domain,
+        "short_url": short_url,
         "hash": short_hash,
         "original_url": long_url
     })
 
 @app.route("/<hash_code>", methods=["GET"])
 def get_short_url(hash_code):
-    fqdn = f"{hash_code}.urlshorten.{DOMAIN}"
+    name = f"{hash_code}.urlshorten"
     try:
-        url = f"https://api.cloudflare.com/client/v4/zones/{CLOUDFLARE_ZONE_ID}/dns_records?type=TXT&name={fqdn}"
+        url = f"{CF_API_BASE}?type=TXT&name={name}"
         resp = requests.get(url, headers=HEADERS)
         data = resp.json()
         if not data.get("success") or len(data.get("result", [])) == 0:
@@ -85,7 +85,7 @@ def get_short_url(hash_code):
         return jsonify({"error": f"Failed to fetch TXT record: {str(e)}"}), 500
 
     return jsonify({
-        "short_url": fqdn,
+        "short_url": f"{hash_code}.urlshorten.{DOMAIN}",
         "redirect_url": target_url
     })
 
